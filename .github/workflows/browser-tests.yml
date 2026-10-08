@@ -1,0 +1,106 @@
+name: UTC Selenium CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      headless:
+        description: Run Chrome in headless mode instead of using the Xvfb display
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+env:
+  PYTHONUTF8: '1'
+  PYTHONUNBUFFERED: '1'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  unit:
+    name: Excel and unit tests (Python ${{ matrix.python }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Validate the 40 Excel specifications against the code
+        run: python run_tests.py --check
+      - name: Test the runner, reader, and reporting
+        run: python -m unittest discover -s tests/unit -v
+
+  browser:
+    name: Chrome browser tests and Allure report
+    needs: unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # All branches share the test account. Prevent concurrent login workflows.
+    concurrency:
+      group: utc-login-browser
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install Python dependencies
+        run: python -m pip install -r requirements.txt
+      # Chrome and ChromeDriver are preinstalled on the ubuntu-24.04 image.
+      # Use system Chrome to retain the runner's sandbox and AppArmor settings.
+      - name: Check Chrome and ChromeDriver, then install the virtual display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth
+          google-chrome --version
+          chromedriver --version
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install the standalone Allure CLI
+        env:
+          ALLURE_VERSION: '2.46.1'
+          ALLURE_SHA256: '37428164f310c8d137cfdd2c3a25d049b233261ddab13e1bd4dfd7627b5cbf8d'
+        run: |
+          archive="$RUNNER_TEMP/allure.tgz"
+          curl --fail --location --retry 3 --max-time 180 \
+            "https://github.com/allure-framework/allure2/releases/download/$ALLURE_VERSION/allure-$ALLURE_VERSION.tgz" \
+            --output "$archive"
+          echo "$ALLURE_SHA256  $archive" | sha256sum --check
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/allure-$ALLURE_VERSION/bin" >> "$GITHUB_PATH"
+      - name: Run authentication tests against the UTC website
+        env:
+          RUN_HEADLESS: ${{ inputs.headless || false }}
+        run: |
+          args=()
+          if [[ "$RUN_HEADLESS" == "true" ]]; then args+=(--headless); fi
+          xvfb-run --auto-servernum --server-args='-screen 0 1366x768x24' \
+            python ci_tests.py "${args[@]}"
+      - name: Upload results and evidence, including on test failure
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: utc-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: reports/
+          if-no-files-found: error
+          retention-days: 14

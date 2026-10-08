@@ -1,0 +1,160 @@
+"""Offline regressions for false passes, isolation, data parity and reporting."""
+import copy
+import hashlib
+import io
+import json
+import tempfile
+import unittest
+import shutil
+from dataclasses import replace
+from pathlib import Path
+from unittest.mock import Mock, patch
+
+from selenium.common.exceptions import TimeoutException, WebDriverException
+from openpyxl import load_workbook
+
+from testcases.reader import FIELDS, WORKBOOK_PATH, coverage_rows, load_cases, validate_cases, validate_mapping
+from config import Settings
+from pages.login_page import LoginPage
+from reporting.test_result import EvidenceResult, result_exit_code, save_results
+from tests import test_login as browser_tests
+
+
+class ProjectRegressionTests(unittest.TestCase):
+    def browser_case(self, id):
+        case = browser_tests.TestLogin("test_" + id)
+        case.settings = Settings()
+        case.spec = browser_tests.CASES[id]
+        case.login_page = Mock()
+        case.driver = Mock()
+        return case
+
+    def test_excel_and_mapping_have_all_original_ids(self):
+        cases = load_cases()
+        validate_mapping(cases)
+        self.assertEqual(len(cases), 40)
+        self.assertTrue(all(c["status"] == "Not Run" and not c["actual"] for c in cases))
+
+    def test_duplicate_id_or_hardcoded_pass_is_rejected(self):
+        for mutation in ("duplicate", "pass"):
+            with self.subTest(mutation=mutation):
+                cases = copy.deepcopy(load_cases())
+                if mutation == "duplicate":
+                    cases[1]["id"] = cases[0]["id"]
+                else:
+                    cases[0]["status"] = "PASS"
+                with self.assertRaises(ValueError):
+                    validate_cases(cases)
+
+    def test_excel_is_read_without_modification_and_contains_all_cases(self):
+        before = hashlib.sha256(WORKBOOK_PATH.read_bytes()).hexdigest()
+        cases = load_cases()
+        self.assertEqual(len(cases), 40)
+        self.assertEqual(list(cases[0]), list(FIELDS))
+        self.assertIn("\n", cases[0]["steps"])
+        self.assertTrue(all(isinstance(case["parameters"], dict) for case in cases))
+        self.assertEqual(hashlib.sha256(WORKBOOK_PATH.read_bytes()).hexdigest(), before)
+
+
+    def test_invalid_excel_header_parameters_formula_or_status_are_rejected(self):
+        for mutation in ("header", "json", "formula", "pass", "duplicate"):
+            with self.subTest(mutation=mutation), tempfile.TemporaryDirectory() as directory:
+                path = Path(directory) / "cases.xlsx"
+                shutil.copyfile(WORKBOOK_PATH, path)
+                workbook = load_workbook(path)
+                sheet = workbook["Testcases"]
+                if mutation == "header":
+                    sheet["A1"] = "Wrong header"
+                elif mutation == "json":
+                    sheet["R2"] = "not JSON"
+                elif mutation == "formula":
+                    sheet["D2"] = "=1+1"
+                elif mutation == "pass":
+                    sheet["K2"] = "PASS"
+                else:
+                    sheet["A3"] = sheet["A2"].value
+                workbook.save(path)
+                workbook.close()
+                with self.assertRaises(ValueError):
+                    load_cases(path)
+
+    def test_execution_workbook_is_separate_and_preserves_unexecuted_cases(self):
+        before = hashlib.sha256(WORKBOOK_PATH.read_bytes()).hexdigest()
+        cases = load_cases()
+        report = {"run_id": "offline-fixture", "results": {"TC_FUNC_01": {"status": "SKIP", "detail": "No browser"}}}
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory)
+            save_results(output, cases, report)
+            workbook = load_workbook(output / "results.xlsx")
+            self.assertEqual(workbook.sheetnames, ["Execution", "Coverage"])
+            self.assertEqual(workbook["Execution"].max_row, 41)
+            self.assertEqual(workbook["Execution"]["B2"].value, "SKIP")
+            self.assertEqual(workbook["Execution"]["B3"].value, "Not Run")
+            rows = [[value if value is not None else "" for value in row]
+                    for row in workbook["Coverage"].iter_rows(min_row=2, values_only=True)]
+            self.assertEqual(rows, coverage_rows(cases))
+            workbook.close()
+            self.assertEqual(json.loads((output / "results.json").read_text(encoding="utf-8")), report)
+        self.assertEqual(hashlib.sha256(WORKBOOK_PATH.read_bytes()).hexdigest(), before)
+
+
+
+
+
+
+
+
+    def test_missing_form_is_error_instead_of_vacuous_post_pass(self):
+        settings = Settings()
+        driver = Mock()
+        driver.execute_script.return_value = None
+        page = LoginPage(driver, settings)
+        page.find = Mock()
+        with self.assertRaises(ValueError):
+            page.login_form()
+
+
+
+
+
+
+
+
+
+
+    def test_report_keeps_skip_and_partial_success_distinct_and_redacts_secrets(self):
+        def skip(case):
+            case.skipTest("Prerequisite missing")
+        def pass_check(case):
+            case.assertTrue(True)
+        def fail_check(case):
+            case.fail("secret-pass must not leak")
+        synthetic = type("Synthetic", (unittest.TestCase,), {
+            "test_TC_FUNC_01": skip, "test_TC_FUNC_08": pass_check, "test_TC_UI_02": fail_check})
+        cases = load_cases()
+        next(case for case in cases if case['id'] == 'TC_FUNC_08')['automation'] = 'Partial'
+        with tempfile.TemporaryDirectory() as directory:
+            factory = lambda *a, **kw: EvidenceResult(*a, report_dir=Path(directory), cases=cases,
+                                                     settings=Settings(password="secret-pass"), **kw)
+            result = unittest.TextTestRunner(stream=io.StringIO(), resultclass=factory).run(
+                unittest.defaultTestLoader.loadTestsFromTestCase(synthetic))
+        self.assertEqual(result.records["TC_FUNC_01"]["status"], "SKIP")
+        self.assertEqual(result.records["TC_FUNC_08"]["status"], "PARTIAL_PASS")
+        self.assertEqual(result.records["TC_UI_02"]["status"], "FAIL")
+        self.assertNotIn("secret-pass", json.dumps(result.records))
+        self.assertNotIn("secret-pass", result.failures[0][1])
+        self.assertEqual(result_exit_code(result), 1)
+
+    def test_runner_exit_codes_do_not_treat_all_skipped_as_success(self):
+        result = unittest.TestResult()
+        self.assertEqual(result_exit_code(result), 2)
+        result.testsRun = 1
+        self.assertEqual(result_exit_code(result), 0)
+        result.skipped.append((Mock(), "missing"))
+        self.assertEqual(result_exit_code(result), 2)
+        result.errors.append((Mock(), "error"))
+        self.assertEqual(result_exit_code(result), 1)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

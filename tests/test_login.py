@@ -334,6 +334,12 @@ class TestLogin(unittest.TestCase):
     def test_TC_SEC_08(self):
         self.check_xss_payload(self.parameter("payload"))
 
+    def test_TC_SEC_09(self):
+        """Bounded incorrect submissions to a NONEXISTENT user; does not claim lockout coverage."""
+        for attempt in range(self.parameter("attempts")):
+            self.reset_form()
+            self.reject(self.settings.nonexistent_username, self.settings.invalid_password)
+        self.observation(rejected_attempts=attempt + 1)
 
 
 

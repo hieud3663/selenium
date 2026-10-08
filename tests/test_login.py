@@ -470,7 +470,8 @@ class TestLogin(unittest.TestCase):
 
     def test_TC_UI_03(self):
         locators = {"username": self.login_page.USERNAME_INPUT, "password": self.login_page.PASSWORD_INPUT,
-                    "login": self.login_page.LOGIN_BUTTON, "remember": (By.CSS_SELECTOR, self.settings.remember_selector)}
+                    "email": self.login_page.EMAIL_LOGIN_LINK, "login": self.login_page.LOGIN_BUTTON,
+                    "remember": (By.CSS_SELECTOR, self.settings.remember_selector)}
         order = self.parameter("tab_order")
         current = self.login_page.find(locators[order[0]])
         current.click()

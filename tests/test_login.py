@@ -303,6 +303,9 @@ class TestLogin(unittest.TestCase):
                 self.reset_form()
                 self.reject(self.settings.nonexistent_username, "P" * length)
 
+    def test_TC_BND_05(self):
+        self.reject(self.parameter("username"), self.parameter("password"))
+        self.assertNotIn("\ufffd", self.login_page.get_page_source(), "HTML xuất hiện ký tự thay thế lỗi encoding.")
 
 
 

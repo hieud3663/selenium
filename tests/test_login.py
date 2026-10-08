@@ -230,6 +230,9 @@ class TestLogin(unittest.TestCase):
         self.observation(metric=name, samples_ms=samples, limit_ms=limit)
         self.assertLess(max(samples), limit)
 
+    def test_TC_FUNC_01(self):
+        """Username known to exist + known incorrect password must be rejected."""
+        self.reject(self.settings.username, self.settings.invalid_password)
 
 
 

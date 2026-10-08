@@ -97,9 +97,23 @@ class ProjectRegressionTests(unittest.TestCase):
             self.assertEqual(json.loads((output / "results.json").read_text(encoding="utf-8")), report)
         self.assertEqual(hashlib.sha256(WORKBOOK_PATH.read_bytes()).hexdigest(), before)
 
+    def test_wrong_credentials_cannot_pass_without_expected_error(self):
+        case = self.browser_case("TC_FUNC_01")
+        case.login_page.wait_for_error.side_effect = TimeoutException("No error response")
+        with self.assertRaises(TimeoutException):
+            case.test_TC_FUNC_01()
 
 
 
+    def test_auth_rejection_does_not_submit_valid_password_or_access_protected_page(self):
+        case = self.browser_case("TC_FUNC_01")
+        case.settings = replace(case.settings, success_text="Test User", protected_url="https://example.test/private")
+        case.login_page.wait_for_error.return_value.text = case.settings.error_text
+        case.login_page.is_login_page.return_value = True
+        case.test_TC_FUNC_01()
+        case.driver.get.assert_not_called()
+        case.login_page.wait_for_success.assert_not_called()
+        case.login_page.login.assert_called_once_with(case.settings.username, case.settings.invalid_password, enter=False)
 
 
 
@@ -117,6 +131,15 @@ class ProjectRegressionTests(unittest.TestCase):
 
 
 
+    def test_missing_credentials_report_error_before_driver_creation(self):
+        case = browser_tests.TestLogin("test_TC_FUNC_01")
+        case.settings = Settings(run_browser=True, username="", password="")
+        with patch.object(browser_tests.webdriver, "Chrome") as chrome:
+            result = unittest.TestResult()
+            case.run(result)
+            chrome.assert_not_called()
+            self.assertEqual(len(result.errors), 1)
+            self.assertFalse(result.skipped)
 
 
 

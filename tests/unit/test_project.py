@@ -148,6 +148,14 @@ class ProjectRegressionTests(unittest.TestCase):
         self.assertEqual(calls[0].args[0], "RUNTIME_SQL_SAMPLE")
         self.assertEqual(len(calls), 1)
 
+    def test_sql_error_markers_do_not_match_benign_theme_or_product_names(self):
+        case = self.browser_case("TC_SEC_06")
+        case.assert_rejected = Mock()
+        case.login_page.get_page_source.return_value = "<div class='flora-panel'>SQLServer documentation</div>"
+        case.test_TC_SEC_06()
+        case.login_page.get_page_source.return_value = "ORA-00933: SQL command not properly ended"
+        with self.assertRaises(AssertionError):
+            case.test_TC_SEC_06()
 
     def test_auth_rejection_does_not_submit_valid_password_or_access_protected_page(self):
         case = self.browser_case("TC_FUNC_01")

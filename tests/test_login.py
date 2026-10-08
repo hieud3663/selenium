@@ -291,6 +291,11 @@ class TestLogin(unittest.TestCase):
     def test_TC_BND_02(self):
         self.reject("nonexistent user", self.settings.invalid_password)
 
+    def test_TC_BND_03(self):
+        for length in self.parameter("lengths"):
+            with self.subTest(length=length):
+                self.reset_form()
+                self.reject("A" * length, self.settings.invalid_password)
 
 
 

@@ -430,6 +430,24 @@ class TestLogin(unittest.TestCase):
         self.assertLess(count, self.parameter("limit_requests"))
         self.observation(request_count=count)
 
+    def test_TC_PERF_06(self):
+        """Offline auth request fails at transport; restore network and retry invalid credentials."""
+        network_events(self.driver)
+        self.driver.execute_cdp_cmd("Network.emulateNetworkConditions", {
+            "offline": True, "latency": 0, "downloadThroughput": -1, "uploadThroughput": -1})
+        try:
+            try:
+                self.login_page.login(self.settings.nonexistent_username, self.settings.invalid_password)
+            except TimeoutException:
+                pass
+            events = collect_until_idle(self.driver, self.settings.timeout)
+            failures = [event for event in events if event["method"] == "Network.loadingFailed"]
+            self.assertTrue(failures, "Offline submission không có bằng chứng request thất bại.")
+        finally:
+            self.driver.execute_cdp_cmd("Network.emulateNetworkConditions", {
+                "offline": False, "latency": 0, "downloadThroughput": -1, "uploadThroughput": -1})
+        self.login_page.navigate()
+        self.reject(self.settings.nonexistent_username, self.settings.invalid_password)
 
 
 

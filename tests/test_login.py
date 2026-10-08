@@ -449,6 +449,12 @@ class TestLogin(unittest.TestCase):
         self.login_page.navigate()
         self.reject(self.settings.nonexistent_username, self.settings.invalid_password)
 
+    def test_TC_UI_01(self):
+        for locator in (self.login_page.USERNAME_INPUT, self.login_page.PASSWORD_INPUT, self.login_page.LOGIN_BUTTON):
+            element = self.login_page.find(locator)
+            self.assertTrue(element.is_displayed())
+            self.assertTrue(element.is_enabled())
+        self.assertTrue(self.driver.title.strip())
 
 
 

@@ -281,7 +281,45 @@ class ProjectRegressionTests(unittest.TestCase):
         for driver in drivers:
             driver.quit.assert_called_once()
 
+    def test_suite_reuses_one_visible_browser_and_resets_state_between_cases(self):
+        page = Mock()
+        page.get_attribute.side_effect = ["password", "MaskingTest_123"]
+        driver = Mock()
+        driver.window_handles = ["main"]
+        driver.get_log.return_value = []
+        driver.title = "Login"
+        cases = [browser_tests.TestLogin("test_TC_SEC_01"), browser_tests.TestLogin("test_TC_UI_01")]
+        with patch.object(browser_tests.webdriver, "Chrome", return_value=driver) as chrome, \
+             patch.object(browser_tests, "LoginPage", return_value=page):
+            result = unittest.TestResult()
+            unittest.TestSuite(cases).run(result)
+        self.assertTrue(result.wasSuccessful(), str(result.errors) + str(result.failures))
+        self.assertEqual(result.testsRun, 2)
+        chrome.assert_called_once()
+        driver.quit.assert_called_once()
+        commands = [call.args[0] for call in driver.execute_cdp_cmd.call_args_list]
+        for command in ("Storage.clearDataForOrigin", "Network.clearBrowserCookies", "Emulation.clearDeviceMetricsOverride"):
+            self.assertEqual(commands.count(command), 2)
+        self.assertFalse(any(arg.startswith("--headless") for arg in chrome.call_args.kwargs["options"].arguments))
+        self.assertEqual(chrome.call_args.kwargs["options"].page_load_strategy, "eager")
+        self.assertEqual(commands.count("Page.stopLoading"), 2)
+        self.assertNotIn("Network.clearBrowserCache", commands)
+        self.assertEqual(driver.get.call_args_list[0].args, ("about:blank",))
 
+    def test_shared_driver_cleanup_runs_once_after_case_errors(self):
+        driver = Mock()
+        driver.window_handles = ["main"]
+        driver.get_log.return_value = []
+        page = Mock()
+        page.navigate.side_effect = WebDriverException("navigation failed")
+        cases = [browser_tests.TestLogin("test_TC_SEC_01"), browser_tests.TestLogin("test_TC_UI_01")]
+        with patch.object(browser_tests.webdriver, "Chrome", return_value=driver) as chrome, \
+             patch.object(browser_tests, "LoginPage", return_value=page):
+            result = unittest.TestResult()
+            unittest.TestSuite(cases).run(result)
+        self.assertEqual(len(result.errors), 2)
+        chrome.assert_called_once()
+        driver.quit.assert_called_once()
 
     def test_report_keeps_skip_and_partial_success_distinct_and_redacts_secrets(self):
         def skip(case):

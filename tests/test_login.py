@@ -254,6 +254,13 @@ class TestLogin(unittest.TestCase):
         self.assertNotEqual(sample, self.settings.invalid_password)
         self.reject(self.settings.username, sample)
 
+    def test_TC_FUNC_08(self):
+        box = self.login_page.remember_checkbox()
+        if not box.is_selected():
+            self.login_page.toggle_remember_me()
+        self.login_page.wait.until(lambda _: self.login_page.remember_checkbox().is_selected())
+        self.assertTrue(self.login_page.remember_checkbox().is_selected())
+        self.reject(self.settings.nonexistent_username, self.settings.invalid_password)
 
 
 

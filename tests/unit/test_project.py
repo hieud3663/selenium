@@ -117,6 +117,13 @@ class ProjectRegressionTests(unittest.TestCase):
 
 
 
+    def test_checkbox_no_change_cannot_pass(self):
+        case = self.browser_case("TC_FUNC_08")
+        case.login_page.remember_checkbox.return_value.is_selected.return_value = False
+        case.login_page.wait.until.side_effect = lambda condition: (
+            True if condition(case.driver) else (_ for _ in ()).throw(TimeoutException("No change")))
+        with self.assertRaises(TimeoutException):
+            case.test_TC_FUNC_08()
 
     def test_missing_form_is_error_instead_of_vacuous_post_pass(self):
         settings = Settings()

@@ -424,6 +424,11 @@ class TestLogin(unittest.TestCase):
         self.assertLess(total, self.parameter("limit_bytes"))
         self.observation(transferred_bytes=total)
 
+    def test_TC_PERF_05(self):
+        count = len(requests(self.cold_page_events()))
+        self.assertGreater(count, 0)
+        self.assertLess(count, self.parameter("limit_requests"))
+        self.observation(request_count=count)
 
 
 

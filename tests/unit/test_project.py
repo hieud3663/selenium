@@ -122,6 +122,12 @@ class ProjectRegressionTests(unittest.TestCase):
             case.test_TC_FUNC_10()
         self.assertTrue(case.login_page.login.call_args.kwargs["enter"])
 
+    def test_whitespace_case_cannot_pass_from_nonempty_input_alone(self):
+        case = self.browser_case("TC_BND_01")
+        case.settings = replace(case.settings, username_trim="accept")
+        case.login_page.wait_for_error.side_effect = TimeoutException("No rejection")
+        with self.assertRaises(TimeoutException):
+            case.test_TC_BND_01()
 
     def test_checkbox_no_change_cannot_pass(self):
         case = self.browser_case("TC_FUNC_08")

@@ -212,6 +212,14 @@ class ProjectRegressionTests(unittest.TestCase):
         with self.assertRaises(AssertionError):
             case.test_TC_FUNC_05()
 
+    def test_xss_alert_and_unexpected_driver_errors_are_not_swallowed(self):
+        case = self.browser_case("TC_SEC_07")
+        case.login_page.wait.until.return_value = Mock()
+        with self.assertRaises(AssertionError):
+            case.test_TC_SEC_07()
+        case.login_page.wait.until.side_effect = WebDriverException("driver disconnected")
+        with self.assertRaises(WebDriverException):
+            case.test_TC_SEC_07()
 
     def test_explicitly_disabled_browser_does_not_create_driver(self):
         case = browser_tests.TestLogin("test_TC_SEC_01")

@@ -328,6 +328,8 @@ class TestLogin(unittest.TestCase):
     def test_TC_SEC_06(self):
         self.check_sql_payload(self.parameter("payload"))
 
+    def test_TC_SEC_07(self):
+        self.check_xss_payload(self.parameter("payload"))
 
 
 

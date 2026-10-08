@@ -468,6 +468,18 @@ class TestLogin(unittest.TestCase):
         else:
             self.assert_rejected(self.parameter('error_text'))
 
+    def test_TC_UI_03(self):
+        locators = {"username": self.login_page.USERNAME_INPUT, "password": self.login_page.PASSWORD_INPUT,
+                    "login": self.login_page.LOGIN_BUTTON, "remember": (By.CSS_SELECTOR, self.settings.remember_selector)}
+        order = self.parameter("tab_order")
+        current = self.login_page.find(locators[order[0]])
+        current.click()
+        for name in order[1:]:
+            current.send_keys(Keys.TAB)
+            expected = self.login_page.find(locators[name])
+            self.login_page.wait.until(lambda driver: driver.switch_to.active_element == expected)
+            current = self.driver.switch_to.active_element
+            self.assertEqual(current, expected)
 
 
 

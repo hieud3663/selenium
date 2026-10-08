@@ -198,6 +198,14 @@ class ProjectRegressionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             page.login_form()
 
+    def test_absent_zero_negative_nonfinite_or_boolean_metric_fails(self):
+        case = self.browser_case("TC_PERF_03")
+        for metric in (None, {}, {"ttfb": 0}, {"ttfb": -1}, {"ttfb": float("nan")},
+                       {"ttfb": float("inf")}, {"ttfb": True}):
+            with self.subTest(metric=metric):
+                case.driver.execute_script.return_value = metric
+                with self.assertRaises(AssertionError):
+                    case.navigation_metric("ttfb")
 
     def test_missing_error_or_missing_login_form_cannot_pass_negative_login(self):
         case = self.browser_case("TC_FUNC_05")

@@ -412,6 +412,8 @@ class TestLogin(unittest.TestCase):
         self.observation(rejection_latency_ms=samples, limit_ms=self.parameter("limit_ms"))
         self.assertLess(max(samples), self.parameter("limit_ms"))
 
+    def test_TC_PERF_03(self):
+        self.page_samples("ttfb", self.settings.ttfb_limit_ms)
 
 
 

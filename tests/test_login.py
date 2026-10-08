@@ -288,6 +288,8 @@ class TestLogin(unittest.TestCase):
     def test_TC_BND_01(self):
         self.reject("  " + self.settings.nonexistent_username + "  ", self.settings.invalid_password)
 
+    def test_TC_BND_02(self):
+        self.reject("nonexistent user", self.settings.invalid_password)
 
 
 

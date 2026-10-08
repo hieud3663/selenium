@@ -10,17 +10,15 @@ ROOT = Path(__file__).resolve().parent
 class Settings:
     url: str = "https://vanphongdientu.utc.edu.vn/"
     timeout: float = 10
-    run_browser: bool = True        # Chạy browser mặc định.
-    run_security: bool = True       # Toàn bộ testcase luôn thuộc lượt chạy mặc định.
-    headless: bool = False          # Hiển thị cửa sổ Chrome khi chạy.
+    run_browser: bool = True
+    run_security: bool = True
+    headless: bool = False
 
-    # Điền tài khoản test và dữ liệu âm đã xác minh trực tiếp tại đây.
     username: str = "huongnt"
     password: str = "123456@utc"
     invalid_password: str = "wrong_password_123"
     nonexistent_username: str = "nonexistent_user_9999"
 
-    # Điền locator/nội dung thực tế sau khi đối chiếu trang mục tiêu.
     success_selector: str = ".user-info, .profile, .fullname, .header-user, #user"
     success_text: str = "huongnt"
     protected_url: str = "https://vanphongdientu.utc.edu.vn/"
@@ -28,7 +26,7 @@ class Settings:
     error_text: str = "Tài khoản hoặc mật khẩu không đúng."
     remember_selector: str = "#persistent"
 
-    username_trim: str = "reject"         # accept hoặc reject theo yêu cầu đã xác minh.
+    username_trim: str = "reject"
     page_load_limit_ms: float | None = 5000.0
     ttfb_limit_ms: float | None = 3000.0
     allure_command: str = "allure"

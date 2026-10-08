@@ -365,6 +365,40 @@ class TestLogin(unittest.TestCase):
             self.assertNotIn(self.settings.invalid_password, unquote_plus(request["url"]))
         self.assertNotIn(self.settings.invalid_password, unquote_plus(self.driver.current_url))
 
+    def test_TC_SEC_12(self):
+        """Login page anti-framing from a different origin, without authentication."""
+        from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+        from threading import Thread
+        import html
+        target = self.settings.url
+        class FixtureHandler(BaseHTTPRequestHandler):
+            def do_GET(handler):
+                body = f'<iframe id="target" src="{html.escape(target, quote=True)}"></iframe>'.encode()
+                handler.send_response(200)
+                handler.send_header("Content-Type", "text/html")
+                handler.end_headers()
+                handler.wfile.write(body)
+            def log_message(handler, *args):
+                pass
+        server = ThreadingHTTPServer(("127.0.0.1", 0), FixtureHandler)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            network_events(self.driver)
+            self.driver.get(f"http://127.0.0.1:{server.server_port}/")
+            events = collect_until_idle(self.driver, self.settings.timeout)
+            observed = [response for response in responses(events) if urlparse(response["url"]).netloc == urlparse(target).netloc]
+            self.assertTrue(observed)
+            headers = {key.lower(): str(value) for key, value in observed[-1]["headers"].items()}
+            self.assertTrue(headers.get("x-frame-options", "").upper() in {"DENY", "SAMEORIGIN"}
+                            or "frame-ancestors" in headers.get("content-security-policy", ""))
+            self.driver.switch_to.frame(self.driver.find_element(By.ID, "target"))
+            self.assertFalse(self.login_page.is_login_page(), "Form login hoạt động trong iframe khác origin.")
+        finally:
+            self.driver.switch_to.default_content()
+            server.shutdown()
+            server.server_close()
+            thread.join(timeout=2)
 
 
 

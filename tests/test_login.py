@@ -456,6 +456,17 @@ class TestLogin(unittest.TestCase):
             self.assertTrue(element.is_enabled())
         self.assertTrue(self.driver.title.strip())
 
+    def test_TC_UI_02(self):
+        self.empty_fields(self.settings.username, "")
+        self.login_page.navigate()
+        self.login_page.enter_username(self.settings.username)
+        self.login_page.enter_password("")
+        self.login_page.find(self.login_page.PASSWORD_INPUT).send_keys(Keys.ENTER)
+        invalid = self.driver.execute_script("return !arguments[0].validity.valid;", self.login_page.find(self.login_page.PASSWORD_INPUT))
+        if invalid:
+            self.assertTrue(self.login_page.is_login_page())
+        else:
+            self.assert_rejected(self.parameter('error_text'))
 
 
 

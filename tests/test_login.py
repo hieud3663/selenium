@@ -243,6 +243,8 @@ class TestLogin(unittest.TestCase):
     def test_TC_FUNC_04(self):
         self.assert_required_fields()
 
+    def test_TC_FUNC_05(self):
+        self.reject(self.settings.nonexistent_username, self.settings.invalid_password)
 
 
 

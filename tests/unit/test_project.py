@@ -128,6 +128,18 @@ class ProjectRegressionTests(unittest.TestCase):
             page.login_form()
 
 
+    def test_missing_error_or_missing_login_form_cannot_pass_negative_login(self):
+        case = self.browser_case("TC_FUNC_05")
+        case.login_page.wait_for_error.side_effect = TimeoutException("No error")
+        with self.assertRaises(TimeoutException):
+            case.test_TC_FUNC_05()
+        case.login_page.wait_for_error.side_effect = None
+        case.login_page.wait_for_error.return_value.text = "Generic error"
+        case.settings = replace(case.settings, error_text="Generic error")
+        case.login_page.is_login_page.return_value = True
+        case.login_page.is_login_page.return_value = False
+        with self.assertRaises(AssertionError):
+            case.test_TC_FUNC_05()
 
 
 

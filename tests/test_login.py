@@ -249,6 +249,10 @@ class TestLogin(unittest.TestCase):
     def test_TC_FUNC_06(self):
         self.reject(self.settings.invalid_password, self.settings.nonexistent_username)
 
+    def test_TC_FUNC_07(self):
+        sample = self.settings.invalid_password.swapcase()
+        self.assertNotEqual(sample, self.settings.invalid_password)
+        self.reject(self.settings.username, sample)
 
 
 

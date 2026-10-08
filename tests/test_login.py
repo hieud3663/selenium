@@ -355,6 +355,15 @@ class TestLogin(unittest.TestCase):
             self.assertEqual(urlparse(response["url"]).scheme, "https")
             self.assertEqual(response.get("securityState"), "secure")
 
+    def test_TC_SEC_11(self):
+        self.assertEqual(self.login_page.login_form().get_attribute("method").lower(), "post")
+        _, action, events = self.reject(self.settings.nonexistent_username, self.settings.invalid_password, capture=True)
+        auth = [request for request in requests(events) if urlparse(request["url"]).path == urlparse(action).path]
+        self.assertTrue(auth)
+        self.assertTrue(all(request["method"] == "POST" for request in auth))
+        for request in requests(events):
+            self.assertNotIn(self.settings.invalid_password, unquote_plus(request["url"]))
+        self.assertNotIn(self.settings.invalid_password, unquote_plus(self.driver.current_url))
 
 
 

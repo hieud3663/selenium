@@ -307,6 +307,10 @@ class TestLogin(unittest.TestCase):
         self.reject(self.parameter("username"), self.parameter("password"))
         self.assertNotIn("\ufffd", self.login_page.get_page_source(), "HTML xuất hiện ký tự thay thế lỗi encoding.")
 
+    def test_TC_SEC_01(self):
+        self.assertEqual(self.login_page.get_attribute(self.login_page.PASSWORD_INPUT, "type"), "password")
+        self.login_page.enter_password("MaskingTest_123")
+        self.assertEqual(self.login_page.get_attribute(self.login_page.PASSWORD_INPUT, "value"), "MaskingTest_123")
 
 
 

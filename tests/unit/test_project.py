@@ -161,6 +161,15 @@ class ProjectRegressionTests(unittest.TestCase):
             case.test_TC_FUNC_05()
 
 
+    def test_explicitly_disabled_browser_does_not_create_driver(self):
+        case = browser_tests.TestLogin("test_TC_SEC_01")
+        case.settings = Settings(run_browser=False)
+        with patch.object(browser_tests.webdriver, "Chrome") as chrome:
+            result = unittest.TestResult()
+            case.run(result)
+            chrome.assert_not_called()
+            self.assertEqual(len(result.errors), 1)
+            self.assertFalse(result.skipped)
 
     def test_missing_credentials_report_error_before_driver_creation(self):
         case = browser_tests.TestLogin("test_TC_FUNC_01")
@@ -172,7 +181,37 @@ class ProjectRegressionTests(unittest.TestCase):
             self.assertEqual(len(result.errors), 1)
             self.assertFalse(result.skipped)
 
+    def test_defaults_start_visible_chrome_and_execute_browser_case(self):
+        case = browser_tests.TestLogin("test_TC_SEC_01")
+        page = Mock()
+        page.get_attribute.side_effect = ["password", "MaskingTest_123"]
+        driver = Mock()
+        with patch.object(browser_tests.webdriver, "Chrome", return_value=driver) as chrome, \
+             patch.object(browser_tests, "LoginPage", return_value=page):
+            result = unittest.TestResult()
+            case.run(result)
+        self.assertTrue(result.wasSuccessful(), str(result.errors) + str(result.failures))
+        self.assertFalse(result.skipped)
+        options = chrome.call_args.kwargs["options"]
+        self.assertFalse(any(argument.startswith("--headless") for argument in options.arguments))
+        page.enter_password.assert_called_once_with("MaskingTest_123")
+        driver.quit.assert_called_once()
 
+    def test_driver_is_independent_and_quit_when_navigation_fails(self):
+        drivers = [Mock(), Mock()]
+        page = Mock()
+        page.navigate.side_effect = WebDriverException("navigation failed")
+        with patch.object(browser_tests.webdriver, "Chrome", side_effect=drivers) as chrome, \
+             patch.object(browser_tests, "LoginPage", return_value=page):
+            for _ in range(2):
+                case = browser_tests.TestLogin("test_TC_SEC_01")
+                case.settings = Settings(run_browser=True)
+                result = unittest.TestResult()
+                case.run(result)
+                self.assertEqual(len(result.errors), 1)
+            self.assertEqual(chrome.call_count, 2)
+        for driver in drivers:
+            driver.quit.assert_called_once()
 
 
 

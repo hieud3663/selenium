@@ -273,6 +273,11 @@ class TestLogin(unittest.TestCase):
         """Enter submission with incorrect credentials produces the same error oracle."""
         self.reject(self.settings.nonexistent_username, self.settings.invalid_password, enter=True)
 
+    def test_TC_FUNC_11(self):
+        """Direct navigation to auth entry without credentials still displays login controls."""
+        self.driver.get(self.settings.url)
+        self.login_page.wait.until(lambda _: self.login_page.is_login_page())
+        self.assertTrue(self.login_page.is_login_page())
 
 
 

@@ -321,6 +321,9 @@ class TestLogin(unittest.TestCase):
     def test_TC_SEC_04(self):
         self.check_sql_payload(self.parameter("payload"))
 
+    def test_TC_SEC_05(self):
+        """SQL sample in PASSWORD rather than USERNAME."""
+        self.check_sql_payload(self.parameter("payload"), field="password")
 
 
 

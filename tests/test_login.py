@@ -341,6 +341,19 @@ class TestLogin(unittest.TestCase):
             self.reject(self.settings.nonexistent_username, self.settings.invalid_password)
         self.observation(rejected_attempts=attempt + 1)
 
+    def test_TC_SEC_10(self):
+        self.assertEqual(urlparse(self.driver.current_url).scheme, "https")
+        self.assertEqual(urlparse(self.login_page.login_form().get_attribute("action")).scheme, "https")
+        _, _, events = self.reject(self.settings.nonexistent_username, self.settings.invalid_password, capture=True)
+        posts = [request for request in requests(events) if request["method"] == "POST"]
+        self.assertTrue(posts)
+        self.assertTrue(all(urlparse(request["url"]).scheme == "https" for request in posts))
+        documents = [event["params"]["response"] for event in events if event["method"] == "Network.responseReceived"
+                     and event["params"].get("type") in {"Document", "XHR", "Fetch"}]
+        self.assertTrue(documents)
+        for response in documents:
+            self.assertEqual(urlparse(response["url"]).scheme, "https")
+            self.assertEqual(response.get("securityState"), "secure")
 
 
 

@@ -27,6 +27,30 @@ class AuthFlowTests(unittest.TestCase):
         with self.assertRaises(TimeoutException):
             page.wait_for_error('Bạn chưa nhập mật khẩu')
 
+    def test_empty_field_check_requires_matching_rejection_and_actual_post(self):
+        for field, case_id in [('username', 'TC_FUNC_02'), ('password', 'TC_FUNC_03'), ('both', 'TC_FUNC_04')]:
+            for method in ('POST', 'GET', None):
+                with self.subTest(field=field, method=method):
+                    case = browser_tests.TestLogin('test_' + case_id)
+                    case.settings = Settings()
+                    case.spec = next(spec for spec in load_cases() if spec['id'] == case_id)
+                    case.driver = Mock()
+                    case.driver.execute_script.return_value = False
+                    case.login_page = Mock()
+                    case.login_page.login_form.return_value.get_attribute.return_value = 'https://example.test/Login'
+                    case.assert_rejected = Mock()
+                    requests = [] if method is None else [{'url': 'https://example.test/Login', 'method': method}]
+                    with patch('tests.test_login.network_events', return_value=[]), \
+                         patch('tests.test_login.collect_until_idle', return_value=[]), \
+                         patch('tests.test_login.requests', return_value=requests):
+                        if method == 'POST':
+                            case.assert_required_fields()
+                        else:
+                            with self.assertRaises(AssertionError):
+                                case.assert_required_fields()
+                    case.assert_rejected.assert_called_once_with(case.spec['parameters']['error_text'])
+                    case.login_page.enter_username.assert_called_once_with('' if field in {'username', 'both'} else 'validation_test')
+                    case.login_page.enter_password.assert_called_once_with('' if field in {'password', 'both'} else 'validation_test')
 
     def test_default_runner_executes_only_auth_scope_even_without_valid_password(self):
         import run_tests

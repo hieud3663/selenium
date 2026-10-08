@@ -240,6 +240,8 @@ class TestLogin(unittest.TestCase):
     def test_TC_FUNC_03(self):
         self.assert_required_fields()
 
+    def test_TC_FUNC_04(self):
+        self.assert_required_fields()
 
 
 

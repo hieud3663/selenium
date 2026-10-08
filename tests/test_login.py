@@ -415,6 +415,14 @@ class TestLogin(unittest.TestCase):
     def test_TC_PERF_03(self):
         self.page_samples("ttfb", self.settings.ttfb_limit_ms)
 
+    def test_TC_PERF_04(self):
+        events = self.cold_page_events()
+        completed = [event["params"]["encodedDataLength"] for event in events if event["method"] == "Network.loadingFinished"]
+        self.assertTrue(completed)
+        total = sum(completed)
+        self.assertGreater(total, 0)
+        self.assertLess(total, self.parameter("limit_bytes"))
+        self.observation(transferred_bytes=total)
 
 
 

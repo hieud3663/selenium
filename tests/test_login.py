@@ -481,6 +481,19 @@ class TestLogin(unittest.TestCase):
             current = self.driver.switch_to.active_element
             self.assertEqual(current, expected)
 
+    def test_TC_UI_04(self):
+        statuses, timing = {"existing": [], "absent": []}, {"existing": [], "absent": []}
+        for _ in range(self.parameter("samples")):
+            for key, username in (("existing", self.settings.username), ("absent", self.settings.nonexistent_username)):
+                self.reset_form()
+                duration, action, events = self.reject(username, self.settings.invalid_password, capture=True)
+                auth = [response for response in responses(events) if urlparse(response["url"]).path == urlparse(action).path]
+                self.assertTrue(auth)
+                statuses[key].append(auth[0]["status"])
+                timing[key].append(duration)
+        self.assertEqual(set(statuses["existing"]), set(statuses["absent"]))
+        self.observation(status_codes=statuses, samples_ms=timing,
+                         median_difference_ms=abs(statistics.median(timing["existing"]) - statistics.median(timing["absent"])))
 
 
 

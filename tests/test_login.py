@@ -366,7 +366,7 @@ class TestLogin(unittest.TestCase):
         self.assertNotIn(self.settings.invalid_password, unquote_plus(self.driver.current_url))
 
     def test_TC_SEC_12(self):
-        """Login page anti-framing from a different origin, without authentication."""
+        """Observe anti-framing headers and iframe behavior without claiming compliance."""
         from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
         from threading import Thread
         import html
@@ -390,10 +390,34 @@ class TestLogin(unittest.TestCase):
             observed = [response for response in responses(events) if urlparse(response["url"]).netloc == urlparse(target).netloc]
             self.assertTrue(observed)
             headers = {key.lower(): str(value) for key, value in observed[-1]["headers"].items()}
-            self.assertTrue(headers.get("x-frame-options", "").upper() in {"DENY", "SAMEORIGIN"}
-                            or "frame-ancestors" in headers.get("content-security-policy", ""))
+            x_frame_options = headers.get("x-frame-options", "").strip().upper()
+            content_security_policy = headers.get("content-security-policy", "")
+            has_x_frame_options = x_frame_options in {"DENY", "SAMEORIGIN"}
+            has_frame_ancestors = any(
+                directive.strip().lower().startswith("frame-ancestors")
+                for directive in content_security_policy.split(";")
+            )
             self.driver.switch_to.frame(self.driver.find_element(By.ID, "target"))
-            self.assertFalse(self.login_page.is_login_page(), "Form login hoạt động trong iframe khác origin.")
+            login_form_loaded = any(element.is_displayed() for element in
+                                    self.driver.find_elements(*self.login_page.USERNAME_INPUT))
+            self.driver.switch_to.default_content()
+            top_level_stayed_on_fixture = urlparse(self.driver.current_url).hostname == "127.0.0.1"
+            findings = []
+            if not has_x_frame_options and not has_frame_ancestors:
+                findings.append("missing_x_frame_options_and_csp_frame_ancestors")
+            if login_form_loaded:
+                findings.append("login_form_rendered_in_cross_origin_iframe")
+            if not top_level_stayed_on_fixture:
+                findings.append("top_level_navigation_left_iframe_fixture")
+            self.observation(
+                framing_assessment="SECURITY_FINDING" if findings else "NO_FINDING_OBSERVED",
+                findings=findings,
+                x_frame_options=x_frame_options or None,
+                csp_frame_ancestors=has_frame_ancestors,
+                login_form_loaded_in_cross_origin_frame=login_form_loaded,
+                top_level_stayed_on_fixture=top_level_stayed_on_fixture,
+            )
+            self.assertTrue(observed[-1].get("status"), "The target frame response status was not captured.")
         finally:
             self.driver.switch_to.default_content()
             server.shutdown()

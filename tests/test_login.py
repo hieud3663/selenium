@@ -234,6 +234,8 @@ class TestLogin(unittest.TestCase):
         """Username known to exist + known incorrect password must be rejected."""
         self.reject(self.settings.username, self.settings.invalid_password)
 
+    def test_TC_FUNC_02(self):
+        self.assert_required_fields()
 
 
 

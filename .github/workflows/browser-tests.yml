@@ -4,11 +4,6 @@ on:
   push:
   pull_request:
   workflow_dispatch:
-    inputs:
-      headless:
-        description: Run Chrome in headless mode instead of using the Xvfb display
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -65,11 +60,8 @@ jobs:
       - name: Install Python dependencies
         run: python -m pip install -r requirements.txt
       # Chrome and ChromeDriver are preinstalled on the ubuntu-24.04 image.
-      # Use system Chrome to retain the runner's sandbox and AppArmor settings.
-      - name: Check Chrome and ChromeDriver, then install the virtual display
+      - name: Check preinstalled Chrome and ChromeDriver
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends xvfb xauth
           google-chrome --version
           chromedriver --version
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
@@ -88,14 +80,8 @@ jobs:
           echo "$ALLURE_SHA256  $archive" | sha256sum --check
           tar -xzf "$archive" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/allure-$ALLURE_VERSION/bin" >> "$GITHUB_PATH"
-      - name: Run authentication tests against the UTC website
-        env:
-          RUN_HEADLESS: ${{ inputs.headless || false }}
-        run: |
-          args=()
-          if [[ "$RUN_HEADLESS" == "true" ]]; then args+=(--headless); fi
-          xvfb-run --auto-servernum --server-args='-screen 0 1366x768x24' \
-            python ci_tests.py "${args[@]}"
+      - name: Run authentication tests with headless Chrome
+        run: python -m tests.ci_runner --headless
       - name: Upload results and evidence, including on test failure
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

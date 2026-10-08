@@ -117,16 +117,16 @@ def main(argv=None):
     try:
         generate_html(report_dir / "allure-results", report_dir / "allure-report", settings.allure_command)
     except (RuntimeError, OSError, subprocess.CalledProcessError) as error:
-        print("Lỗi sinh Allure HTML:", error, file=sys.stderr)
+        print("Allure HTML generation failed:", error, file=sys.stderr)
         report["exit_code"] = 1
         report["allure_html_error"] = result.redact(str(error))
         save_json(report_dir, report)
-    print("Kết quả theo testcase:", report["counts"])
-    print("Chưa thực thi:", len(report["unexecuted_cases"]))
-    print("Báo cáo:", report_dir)
+    print("Test case results:", report["counts"])
+    print("Unexecuted specifications:", len(report["unexecuted_cases"]))
+    print("Report directory:", report_dir)
     print("Allure results:", report_dir / "allure-results")
     if "allure_html_error" not in report:
-        print("Allure HTML:", report_dir / "allure-report")
+        print("Allure HTML report:", report_dir / "allure-report")
     return report["exit_code"]
 
 

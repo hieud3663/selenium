@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import ci_tests
+from tests import ci_runner as ci_tests
 from testcases.reader import load_cases
 
 
@@ -64,7 +64,7 @@ class CITests(unittest.TestCase):
                     self.assertEqual(arguments.count('--test'), len(ids))
                     self.write_report(root, ids, code)
                     return code
-                with patch('ci_tests.ROOT', root), patch('ci_tests.run_tests', side_effect=run), \
+                with patch('tests.ci_runner.ROOT', root), patch('tests.ci_runner.run_tests', side_effect=run), \
                      patch.dict('os.environ', {'GITHUB_STEP_SUMMARY': str(root / 'summary.md')}), \
                      contextlib.redirect_stdout(io.StringIO()):
                     self.assertEqual(ci_tests.main(['--security', '--headless']), code)
@@ -75,9 +75,43 @@ class CITests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             self.write_report(root, ci_tests.selected_ids(load_cases()))
-            with patch('ci_tests.ROOT', root), patch('ci_tests.run_tests', return_value=0), \
+            with patch('tests.ci_runner.ROOT', root), patch('tests.ci_runner.run_tests', return_value=0), \
                  contextlib.redirect_stderr(io.StringIO()):
                 self.assertEqual(ci_tests.main([]), 1)
+
+    def test_observed_framing_finding_is_reported_without_faking_test_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ids = ci_tests.selected_ids(load_cases())
+            def run(arguments):
+                self.assertIn('--headless', arguments)
+                report, output = self.write_report(root, ids)
+                report['environment']['headless'] = True
+                report['results']['TC_SEC_12'] = {
+                    'status': 'PASS',
+                    'observations': {
+                        'framing_assessment': 'SECURITY_FINDING',
+                        'findings': ['missing_x_frame_options_and_csp_frame_ancestors',
+                                     'login_form_rendered_in_cross_origin_iframe'],
+                        'x_frame_options': None,
+                        'csp_frame_ancestors': False,
+                        'login_form_loaded_in_cross_origin_frame': True,
+                    },
+                }
+                (output / 'results.json').write_text(json.dumps(report), encoding='utf-8')
+                return 0
+            summary_path = root / 'summary.md'
+            with patch('tests.ci_runner.ROOT', root), patch('tests.ci_runner.run_tests', side_effect=run), \
+                 patch.dict('os.environ', {'GITHUB_STEP_SUMMARY': str(summary_path)}), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(ci_tests.main(['--headless']), 0)
+            summary = summary_path.read_text(encoding='utf-8')
+            self.assertIn('Headless Chrome', summary)
+            self.assertIn('Security observations', summary)
+            self.assertIn('CI gate', summary)
+            self.assertIn('**PASSED**', summary)
+            self.assertIn('PASS means the observation was collected', summary)
+            self.assertIn('login_form_rendered_in_cross_origin_iframe', summary)
 
 
 if __name__ == '__main__':

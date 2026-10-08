@@ -495,6 +495,22 @@ class TestLogin(unittest.TestCase):
         self.observation(status_codes=statuses, samples_ms=timing,
                          median_difference_ms=abs(statistics.median(timing["existing"]) - statistics.median(timing["absent"])))
 
+    def test_TC_UI_05(self):
+        for width, height in self.parameter("viewports"):
+            with self.subTest(viewport=(width, height)):
+                self.driver.execute_cdp_cmd("Emulation.setDeviceMetricsOverride", {
+                    "width": width, "height": height, "deviceScaleFactor": 1, "mobile": width < 600})
+                self.login_page.navigate()
+                self.assertTrue(self.driver.execute_script("return document.documentElement.scrollWidth <= innerWidth;"))
+                for locator in (self.login_page.USERNAME_INPUT, self.login_page.PASSWORD_INPUT, self.login_page.LOGIN_BUTTON):
+                    element = self.login_page.find(locator)
+                    visible = self.driver.execute_script("""
+                        const e=arguments[0],r=e.getBoundingClientRect(),hit=document.elementFromPoint(r.x+r.width/2,r.y+r.height/2);
+                        return r.width>0 && r.height>0 && r.left>=0 && r.right<=innerWidth && r.top>=0 &&
+                               r.bottom<=innerHeight && (hit===e || e.contains(hit));
+                    """, element)
+                    self.assertIs(visible, True, "Control tràn viewport hoặc bị che.")
+                    self.assertTrue(element.is_enabled())
 
 
 if __name__ == "__main__":

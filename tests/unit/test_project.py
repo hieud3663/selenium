@@ -55,6 +55,28 @@ class ProjectRegressionTests(unittest.TestCase):
         self.assertTrue(all(isinstance(case["parameters"], dict) for case in cases))
         self.assertEqual(hashlib.sha256(WORKBOOK_PATH.read_bytes()).hexdigest(), before)
 
+    def test_reviewed_excel_edits_are_read_directly_without_json_import(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "cases.xlsx"
+            shutil.copyfile(WORKBOOK_PATH, path)
+            workbook = load_workbook(path)
+            workbook["Testcases"]["D2"] = "Reviewed title from Excel"
+            rows = list(workbook["Testcases"].iter_rows())
+            payload_row = next(row for row in rows if row[0].value == "TC_SEC_02")
+            payload_row[-1].value = json.dumps({"payload": "EXCEL_PAYLOAD"})
+            workbook.save(path)
+            workbook.close()
+            cases = load_cases(path)
+            self.assertEqual(cases[0]["title"], "Reviewed title from Excel")
+            case = self.browser_case("TC_SEC_02")
+            case.spec = next(spec for spec in cases if spec["id"] == "TC_SEC_02")
+            case.assert_rejected = Mock()
+            case.login_page.get_page_source.return_value = "clean response"
+            case.test_TC_SEC_02()
+            calls = case.login_page.login.call_args_list
+            self.assertEqual(calls[0].args[0], "EXCEL_PAYLOAD")
+            self.assertEqual(len(calls), 1)
+            self.assertFalse((Path(directory) / "testcases.json").exists())
 
     def test_invalid_excel_header_parameters_formula_or_status_are_rejected(self):
         for mutation in ("header", "json", "formula", "pass", "duplicate"):
@@ -103,6 +125,28 @@ class ProjectRegressionTests(unittest.TestCase):
         with self.assertRaises(TimeoutException):
             case.test_TC_FUNC_01()
 
+    def test_runner_spec_is_not_replaced_by_module_cached_excel_data(self):
+        case = browser_tests.TestLogin("test_TC_SEC_02")
+        case.settings = Settings(run_browser=True, run_security=True, username="test-user",
+                                 invalid_password="wrong", error_selector="#error",
+                                 error_text="Generic error", success_selector="#private")
+        case.spec = copy.deepcopy(browser_tests.CASES["TC_SEC_02"])
+        case.spec["parameters"]["payload"] = "RUNTIME_SQL_SAMPLE"
+        page = Mock()
+        page.wait_for_error.return_value.text = "Generic error"
+        page.is_login_page.return_value = True
+        page.get_page_source.return_value = "clean response"
+        driver = Mock()
+        driver.find_elements.return_value = []
+        with patch.object(browser_tests.webdriver, "Chrome", return_value=driver), \
+             patch.object(browser_tests, "LoginPage", return_value=page):
+            result = unittest.TestResult()
+            case.run(result)
+        self.assertTrue(result.wasSuccessful(), str(result.errors) + str(result.failures))
+        self.assertFalse(result.skipped)
+        calls = page.login.call_args_list
+        self.assertEqual(calls[0].args[0], "RUNTIME_SQL_SAMPLE")
+        self.assertEqual(len(calls), 1)
 
 
     def test_auth_rejection_does_not_submit_valid_password_or_access_protected_page(self):

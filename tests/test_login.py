@@ -312,6 +312,8 @@ class TestLogin(unittest.TestCase):
         self.login_page.enter_password("MaskingTest_123")
         self.assertEqual(self.login_page.get_attribute(self.login_page.PASSWORD_INPUT, "value"), "MaskingTest_123")
 
+    def test_TC_SEC_02(self):
+        self.check_sql_payload(self.parameter("payload"))
 
 
 

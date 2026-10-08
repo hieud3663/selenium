@@ -269,6 +269,9 @@ class TestLogin(unittest.TestCase):
         self.assertFalse(self.login_page.remember_checkbox().is_selected())
         self.reject(self.settings.nonexistent_username, self.settings.invalid_password)
 
+    def test_TC_FUNC_10(self):
+        """Enter submission with incorrect credentials produces the same error oracle."""
+        self.reject(self.settings.nonexistent_username, self.settings.invalid_password, enter=True)
 
 
 

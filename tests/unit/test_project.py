@@ -115,6 +115,12 @@ class ProjectRegressionTests(unittest.TestCase):
         case.login_page.wait_for_success.assert_not_called()
         case.login_page.login.assert_called_once_with(case.settings.username, case.settings.invalid_password, enter=False)
 
+    def test_enter_cannot_pass_merely_because_login_button_remains(self):
+        case = self.browser_case("TC_FUNC_10")
+        case.login_page.wait_for_error.side_effect = TimeoutException("No submit")
+        with self.assertRaises(TimeoutException):
+            case.test_TC_FUNC_10()
+        self.assertTrue(case.login_page.login.call_args.kwargs["enter"])
 
 
     def test_checkbox_no_change_cannot_pass(self):

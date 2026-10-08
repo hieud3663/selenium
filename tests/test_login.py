@@ -403,6 +403,14 @@ class TestLogin(unittest.TestCase):
     def test_TC_PERF_01(self):
         self.page_samples("load", self.settings.page_load_limit_ms)
 
+    def test_TC_PERF_02(self):
+        samples = []
+        for _ in range(self.parameter("samples")):
+            self.reset_form()
+            duration, _, _ = self.reject(self.settings.nonexistent_username, self.settings.invalid_password)
+            samples.append(duration)
+        self.observation(rejection_latency_ms=samples, limit_ms=self.parameter("limit_ms"))
+        self.assertLess(max(samples), self.parameter("limit_ms"))
 
 
 

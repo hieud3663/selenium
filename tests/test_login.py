@@ -400,6 +400,8 @@ class TestLogin(unittest.TestCase):
             server.server_close()
             thread.join(timeout=2)
 
+    def test_TC_PERF_01(self):
+        self.page_samples("load", self.settings.page_load_limit_ms)
 
 
 
